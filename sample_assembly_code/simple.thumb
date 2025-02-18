@@ -1,4 +1,5 @@
 .global _start
+.text
 
 @ START OF PROGRAM
 _start:
@@ -6,6 +7,6 @@ _start:
 	add r2, r3 @ Add r2 to r3 and store in r2
 
 @ DATA SECTION
-.data
+.data 
 
 hello: .ascii "Hello World" @ array of ascii characters

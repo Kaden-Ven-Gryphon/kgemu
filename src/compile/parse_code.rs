@@ -11,22 +11,26 @@ pub enum SectionType {
 	OpCode,
 	Command,
 	Operand,
+	ComplierMark,
+	Literal,
 }
 
 impl FromStr for SectionType {
-	type Err = ();
+	type Err = String;
 
-	fn from_str(s: &str) -> Result<SectionType, ()> {
+	fn from_str(s: &str) -> Result<SectionType, String> {
 		match s {
 			"comment" => Ok(SectionType::Comment),
 			"label" => Ok(SectionType::Label),
 			"opc" => Ok(SectionType::OpCode),
+			"compliemark" => Ok(SectionType::ComplierMark),
+			"literal" => Ok(SectionType::Literal),
 			_ => {
 				if s.starts_with("op") && s.ends_with(&['0','1','2','3','4','5','6','7','8','9']) {
 					Ok(SectionType::Operand)
 				}
 				else {
-					Err(())
+					Err(format!("\"{}\": is an unknown type for SectionType",s))
 				}
 			},
 		}
@@ -47,16 +51,11 @@ pub struct ParsedCode {
 	pub lines: Vec<ParsedLine>
 }
 
+/// takes a line and uses a def regex to parse into parts
 pub fn parse_line(line: &str, def: &language::LanguageDefinition) -> ParsedLine {
 	let mut parsed_line: ParsedLine = Default::default();
 
-	//TODO Implement parsing
-	//TODO get command
-	//TODO get label
-	//TODO get operands
-
-	// get comment
-	// get regex for finding a comment
+	
 	let re = def.line_regex();
 	if let Some(caps) = re.captures(line)
 	{
