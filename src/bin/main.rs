@@ -6,7 +6,7 @@ fn main() {
 	hello_emulate();
 
 	let thumb_def: language::LanguageDefinition = Default::default();
-	let parsed_simple = compile::parse_code::parse_from_file("./sample_assembly_code/simple.thumb", thumb_def);
+	let parsed_simple = thumb_def.parse_from_file("./sample_assembly_code/simple.thumb");
 
 	println!("File Name: {}", parsed_simple.file_name);
 	println!("File Length: {}", parsed_simple.file_size);

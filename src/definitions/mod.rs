@@ -10,127 +10,433 @@ pub mod prelude {
 
 pub mod language {
 
-	use regex::Regex;
-	use super::processor::ProcessorDefinition;
+	use std::vec;
+	use super::processor::{ProcessorDefinition, SegType};
+
+	// This is a way to organize a set of capture groups for generating regex exspresions to parse code
+	// Not fully implemented yet
+	pub struct VecTree<T> {
+		pub value: Option<T>,
+		pub adjacent: Option<Box<VecTree<T>>>,
+		pub right: Option<Box<VecTree<T>>>,
+		pub left: Option<Box<VecTree<T>>>,
+	}
+
+	// used to create the regex, not implemented yet
+	pub enum CaptureGroupWSBuffer {
+		Before,
+		After,
+		Both,
+		None,
+	}
+
+	pub struct CaptureGroup {
+		pub name: String,
+		pub regex: String,
+		pub capture: bool,
+		pub ws_buffer: CaptureGroupWSBuffer,
+	}
+
+
+
 	pub struct CommandDefinition {
-		pub command: String,
-		pub operands: Option<Vec<String>>,
-		pub command_bin: Vec<u8>,
-		pub command_mask: Vec<u8>,
+		pub regex: String,
+		pub segments: Vec<(SegType, String)>,
+		pub format_index: i32,
 	}
 
-	pub struct LanguageDefinition {
-		pub comment_marker_regex: String,
-		pub label_name_regex: String,
-		pub label_marker: String,
-		pub literal_regex: String,
-		pub op_code_regex: String,
-		pub max_operands: i32,
-		pub operand_regex: String,
-		pub operand_delim_regex: String,
-		pub white_space_regex: String,
-		pub compile_marker_regex: String,
+	pub struct LanguageDefinition { 
 		pub processor_def: ProcessorDefinition,
-		pub commands: Vec<CommandDefinition>,
+		pub regex_list: Vec<String>,
+		//pub capture_groups:Vec<VecTree<CaptureGroup>>,
+		pub commands: Vec<(String,Vec<CommandDefinition>)>,
 	}
 
-
+  
 	impl Default for LanguageDefinition {
 		fn default() -> Self {
 			LanguageDefinition {
-				comment_marker_regex: r"@".to_string(),
-				label_name_regex: r"[a-zA-Z_][a-zA-Z0-9_]*".to_string(),
-				label_marker: r":".to_string(),
-				literal_regex: r#"(#[0-9][0-9_x]?[0-9]*|"[\w\s]*")"#.to_string(),
-				op_code_regex: r"[_a-zA-Z]+".to_string(),
-				max_operands: 2,
-				operand_regex: r"[a-zA-Z0-9_]+".to_string(),
-				operand_delim_regex: r"[ ,]".to_string(),
-				white_space_regex: r"[ \t]*".to_string(),
-				compile_marker_regex: r"\.[a-zA-Z]+[\s]".to_string(),
+				
 				processor_def: Default::default(),
-				commands: vec![]
+				regex_list: vec![
+					r"^(?:[ \t]*)(?:(?P<label>[a-zA-Z_][a-zA-Z0-9_]*):)?(?:[ \t]*)(?P<command>[a-zA-Z][a-zA-Z0-9# \t,]*)?(?:[ \t]*)(?P<comment>@.*)?$".to_string(),
+					r"^(?:[ \t]*)(?P<compliemark>.[a-zA-Z]*)(?:[ \t]*)(?P<literal>[a-zA-Z_]+)?(?:[ \t]*)(?P<comment>@.*)?$".to_string(),
+					r##"^(?:[ \t]*)(?:(?P<label>[a-zA-Z_][a-zA-Z0-9_]*):)(?:[ \t]*)(?P<compliemark>.[a-zA-Z]*)(?:[ \t]*)(?P<literal>[#0-9xbn]+|"[\w\s]*")(?:[ \t]*)(?P<comment>@.*)?$"##.to_string(),
+				],
+				/*/
+				capture_groups:vec![VecTree{
+					value: Some(CaptureGroup{
+						name: "label_outer".to_string(),
+						regex: r":".to_string(),
+						capture: false,
+						ws_buffer: CaptureGroupWSBuffer::Both,
+					}),
+					adjacent: None,
+					right: Some(Box::new(VecTree{
+						value: Some(CaptureGroup {
+							name: "label".to_string(),
+							regex: r"".to_string(),
+							capture: true,
+							ws_buffer: CaptureGroupWSBuffer::None,
+						}),
+						adjacent: None,
+						left: None,
+						right: None,
+					} )),
+					left: None,
+				},], */
+				commands: vec![
+					("ADC".to_string(), vec![
+						CommandDefinition{
+							regex: r"ADC[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"5".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("ADD".to_string(), vec![
+						CommandDefinition{
+							regex: r"ADD[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7]),[ \t]+(?P<immediate>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Flag,"0".to_string()),(SegType::Op,"0".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string()),(SegType::Immediate,"immediate".to_string())],
+							format_index: 2
+						},
+						CommandDefinition{
+							regex: r"ADD[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7]),[ \t]+(?P<immediate>#0x[0-9a-fA-F]+|#[0-9]+)".to_string(),
+							segments: vec![(SegType::Flag,"1".to_string()),(SegType::Op,"0".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string()),(SegType::Immediate,"immediate".to_string())],
+							format_index: 2
+						},
+						CommandDefinition{
+							regex: r"ADD[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<offset>#0x[0-9a-fA-F]+|#[0-9]+)".to_string(),
+							segments: vec![(SegType::Op,"2".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Immediate,"offset".to_string())],
+							format_index: 3
+						},
+						CommandDefinition{
+							regex: r"ADD[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[hH][0-7])".to_string(),
+							segments: vec![(SegType::Op,"0".to_string()),(SegType::Flag,"0".to_string()),(SegType::Flag,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+						CommandDefinition{
+							regex: r"ADD[ \t]+(?P<destination>[hH][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"0".to_string()),(SegType::Flag,"1".to_string()),(SegType::Flag,"0".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+						CommandDefinition{
+							regex: r"ADD[ \t]+(?P<destination>[hH][0-7]),[ \t]+(?P<source>[hH][0-7])".to_string(),
+							segments: vec![(SegType::Op,"0".to_string()),(SegType::Flag,"1".to_string()),(SegType::Flag,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+					]),
+					("AND".to_string(), vec![
+						CommandDefinition{
+							regex: r"AND[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"0".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("ASR".to_string(), vec![
+						CommandDefinition{
+							regex: r"ASR[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7]),[ \t]+(?P<offset>#0x[0-9a-fA-F]+|#[0-9]+)".to_string(),
+							segments: vec![(SegType::Op,"2".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string()),(SegType::Immediate,"offset".to_string())],
+							format_index: 1
+						},
+						CommandDefinition{
+							regex: r"ASR[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"4".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("B".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("B".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("B[a][a]".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("BIC".to_string(), vec![
+						CommandDefinition{
+							regex: r"BIC[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"14".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("BL".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("BX".to_string(), vec![
+						CommandDefinition{
+							regex: r"BX[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"3".to_string()),(SegType::Flag,"0".to_string()),(SegType::Flag,"1".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+						CommandDefinition{
+							regex: r"BX[ \t]+(?P<source>[hH][0-7])".to_string(),
+							segments: vec![(SegType::Op,"3".to_string()),(SegType::Flag,"0".to_string()),(SegType::Flag,"1".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+					]),
+					("CMN".to_string(), vec![
+						CommandDefinition{
+							regex: r"CMN[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"11".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("CMP".to_string(), vec![
+						CommandDefinition{
+							regex: r"CMP[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<offset>#0x[0-9a-fA-F]+|#[0-9]+)".to_string(),
+							segments: vec![(SegType::Op,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Immediate,"offset".to_string())],
+							format_index: 3
+						},
+						CommandDefinition{
+							regex: r"CMP[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"10".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+						CommandDefinition{
+							regex: r"CMP[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[hH][0-7])".to_string(),
+							segments: vec![(SegType::Op,"1".to_string()),(SegType::Flag,"0".to_string()),(SegType::Flag,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+						CommandDefinition{
+							regex: r"CMP[ \t]+(?P<destination>[hH][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"1".to_string()),(SegType::Flag,"1".to_string()),(SegType::Flag,"0".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+						CommandDefinition{
+							regex: r"CMP[ \t]+(?P<destination>[hH][0-7]),[ \t]+(?P<source>[hH][0-7])".to_string(),
+							segments: vec![(SegType::Op,"1".to_string()),(SegType::Flag,"1".to_string()),(SegType::Flag,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+					]),
+					("EOR".to_string(), vec![
+						CommandDefinition{
+							regex: r"EOR[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("LDMIA".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("LDR".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("LDRB".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("LDRH".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("LSL".to_string(), vec![
+						CommandDefinition{
+							regex: r"LSL[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7]),[ \t]+(?P<offset>#0x[0-9a-fA-F]+|#[0-9]+)".to_string(),
+							segments: vec![(SegType::Op,"0".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string()),(SegType::Immediate,"offset".to_string())],
+							format_index: 1
+						},
+						CommandDefinition{
+							regex: r"LSL[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"2".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("LDSB".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("LDSH".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("LSR".to_string(), vec![
+						CommandDefinition{
+							regex: r"LSR[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7]),[ \t]+(?P<offset>#0x[0-9a-fA-F]+|#[0-9]+)".to_string(),
+							segments: vec![(SegType::Op,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string()),(SegType::Immediate,"offset".to_string())],
+							format_index: 1
+						},
+						CommandDefinition{
+							regex: r"LSR[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"3".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("MOV".to_string(), vec![
+						CommandDefinition{
+							regex: r"MOV[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<offset>#0x[0-9a-fA-F]+|#[0-9]+)".to_string(),
+							segments: vec![(SegType::Op,"0".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Immediate,"offset".to_string())],
+							format_index: 3
+						},
+						CommandDefinition{
+							regex: r"MOV[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[hH][0-7])".to_string(),
+							segments: vec![(SegType::Op,"2".to_string()),(SegType::Flag,"0".to_string()),(SegType::Flag,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+						CommandDefinition{
+							regex: r"MOV[ \t]+(?P<destination>[hH][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"2".to_string()),(SegType::Flag,"1".to_string()),(SegType::Flag,"0".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+						CommandDefinition{
+							regex: r"MOV[ \t]+(?P<destination>[hH][0-7]),[ \t]+(?P<source>[hH][0-7])".to_string(),
+							segments: vec![(SegType::Op,"2".to_string()),(SegType::Flag,"1".to_string()),(SegType::Flag,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 5
+						},
+					]),
+					("MUL".to_string(), vec![
+						CommandDefinition{
+							regex: r"MUL[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"13".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("MVN".to_string(), vec![
+						CommandDefinition{
+							regex: r"MVN[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"15".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("NEG".to_string(), vec![
+						CommandDefinition{
+							regex: r"NEG[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"9".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("ORR".to_string(), vec![
+						CommandDefinition{
+							regex: r"ORR[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"12".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("POP".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("PUSH".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("ROR".to_string(), vec![
+						CommandDefinition{
+							regex: r"ROR[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"7".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("SBC".to_string(), vec![
+						CommandDefinition{
+							regex: r"SBC[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"6".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+					("STMIA".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("STR".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("STRB".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("STRH".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("SWI".to_string(), vec![
+						CommandDefinition{
+							regex: "".to_string(),
+							segments: vec![],
+							format_index: 0
+						}
+					]),
+					("SUB".to_string(), vec![
+						CommandDefinition{
+							regex: r"SUB[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7]),[ \t]+(?P<immediate>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Flag,"0".to_string()),(SegType::Op,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string()),(SegType::Immediate,"immediate".to_string())],
+							format_index: 2
+						},
+						CommandDefinition{
+							regex: r"SUB[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7]),[ \t]+(?P<immediate>#0x[0-9a-fA-F]+|#[0-9]+)".to_string(),
+							segments: vec![(SegType::Flag,"1".to_string()),(SegType::Op,"1".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string()),(SegType::Immediate,"immediate".to_string())],
+							format_index: 2
+						},
+						CommandDefinition{
+							regex: r"SUB[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<offset>#0x[0-9a-fA-F]+|#[0-9]+)".to_string(),
+							segments: vec![(SegType::Op,"3".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Immediate,"offset".to_string())],
+							format_index: 3
+						}
+					]),
+					("TST".to_string(), vec![
+						CommandDefinition{
+							regex: r"TST[ \t]+(?P<destination>[rR][0-7]),[ \t]+(?P<source>[rR][0-7])".to_string(),
+							segments: vec![(SegType::Op,"8".to_string()),(SegType::Destination,"destination".to_string()),(SegType::Source,"source".to_string())],
+							format_index: 4
+						},
+					]),
+				]
 			}
-		}
-	}
-
-	impl LanguageDefinition {
-		fn comment_regex_string(&self) -> String {
-			let re_str = format!("(?P<comment>{}.*)?", self.comment_marker_regex);
-			re_str
-		}
-
-		pub fn comment_regex(&self) -> Regex {
-			let re = Regex::new(self.comment_regex_string().as_str()).unwrap();
-			re
-		}
-
-		fn label_regex_string(&self) -> String {
-			let re_str = format!("(?:(?P<label>{})[ \\t]*{})?", self.label_name_regex, self.label_marker);
-			re_str
-		}
-
-		pub fn label_regex(&self) -> Regex {
-			let re = Regex::new(self.label_regex_string().as_str()).unwrap();
-			re
-		}
-
-		fn literal_regex_string(&self) -> String {
-			let re_str = format!("(?:{ws}{d}?{ws}(?P<literal>{}))?", self.literal_regex, ws=self.white_space_regex, d=self.operand_delim_regex);
-			re_str
-		}
-
-		pub fn literal_regex(&self) -> Regex {
-			let re = Regex::new(&self.literal_regex_string()).unwrap();
-			re
-		}
-
-		fn opc_regex_string(&self) -> String {
-			let re_str = format!("(?P<opc>{})", self.op_code_regex);
-			re_str
-		}
-
-		fn op_regex_string(&self, i: i32) -> String {
-			let re_str = format!(r"(?P<op{}>{})", i.to_string(), self.operand_regex);
-			re_str
-		}
-
-		fn compile_mark_regex_string(&self) -> String {
-			let re_str = format!(r"(?P<compliemark>{})?", self.compile_marker_regex);
-			re_str
-		}
-		/// Create a regex string for finding a command and its non literal operands
-		fn command_regex_string(&self) -> String {
-			// the nested set of operands, empty to start
-			let mut re_ops = "".to_string();
-
-			// nest operands staring for the last to the second
-			for i in (1..self.max_operands).rev() {
-				re_ops = format!(r"(?:{ws}{d}{ws}{op}{prev})?", ws=self.white_space_regex, d=self.operand_delim_regex, op=self.op_regex_string(i), prev=re_ops);
-			}
-
-			// nest the second - last operands in with the first
-			re_ops = format!(r"(?:{ws}{first}{ws}{rest})?", first=self.op_regex_string(0), ws=self.white_space_regex, rest = re_ops);
-
-			// combine with opcode regex to form full command string
-			let re_str =  format!(r"(?:{opc}{ws}(?:{ops})?)?", opc=self.opc_regex_string(), ops=re_ops,ws = self.white_space_regex);
-			re_str
-		}
-
-		pub fn line_regex_string(&self) -> String {
-			let re_label = self.label_regex_string();
-			let re_comment = self.comment_regex_string();
-			let re_command =self.command_regex_string();
-			let re_comp_mark = self.compile_mark_regex_string();
-			let re_literal_mark = self.literal_regex_string();
-			let re_str = format!(r"^{ws}{l}{ws}{cm}{ws}{cmd}{ws}{lit}{ws}{com}$", l=re_label, cm=re_comp_mark, cmd=re_command, lit=re_literal_mark, com=re_comment, ws = self.white_space_regex);
-			re_str
-		}
-
-		/// returns a Regex for using the definition LanguageDefinition's values for a line of code
-		pub fn line_regex(&self) -> Regex {
-			let re = Regex::new(&self.line_regex_string()).unwrap();
-			re 
 		}
 	}
 }
@@ -215,10 +521,10 @@ pub mod processor {
 							OperationSeg { name: None, mask: vec![0b11100000,0], seg_type: SegType::Main, values: Some(vec![vec![0b00100000,0]])},
 							// OP: Mask: 0001 1000 0000 0000 Values: all [MOV]: 00, [CMP]: 01, [ADD]: 10, [SUB]: 11
 							OperationSeg { name: Some("Op".to_string()), mask: vec![0b00011000,0], seg_type: SegType::Op, values: None},
-							// Source register: Mask: 0000 0111 0000 0000 Values: Any
-							OperationSeg { name: Some("Rd".to_string()), mask: vec![0b00000111,0], seg_type: SegType::Source, values: None},
+							// Source/Destination register: Mask: 0000 0111 0000 0000 Values: Any
+							OperationSeg { name: Some("Rd".to_string()), mask: vec![0b00000111,0], seg_type: SegType::Destination, values: None},
 							// Offset8: Mask: 0000 0000 1111 1111 Values: Any
-							OperationSeg { name: Some("Offset8".to_string()), mask: vec![0,0b11111111], seg_type: SegType::Destination, values: None},
+							OperationSeg { name: Some("Offset8".to_string()), mask: vec![0,0b11111111], seg_type: SegType::Immediate, values: None},
 						]
 					},
 					Format {
@@ -457,22 +763,3 @@ pub mod device {
 
 }
 
-
-#[cfg(test)]
-mod tests {
-
-    use super::language::LanguageDefinition;
-
-    #[test]
-    fn create_line_regex() {
-        let expected = r#"^[ \t]*(?:(?P<label>[a-zA-Z_][a-zA-Z0-9_]*)[ \t]*:)?[ \t]*(?P<compliemark>\.[a-zA-Z]+[\s])?[ \t]*(?:(?P<opc>[_a-zA-Z]+)[ \t]*(?:(?:[ \t]*(?P<op0>[a-zA-Z0-9_]+)[ \t]*(?:[ \t]*[ ,][ \t]*(?P<op1>[a-zA-Z0-9_]+))?)?)?)?[ \t]*(?:[ \t]*[ ,]?[ \t]*(?P<literal>(#[0-9][0-9_x]?[0-9]*|"[\w\s]*")))?[ \t]*(?P<comment>@.*)?$"#;
-		let default_lang: LanguageDefinition = Default::default();
-
-		let got = default_lang.line_regex_string();
-
-		assert_eq!(got, expected);
-
-		println!("{}", got);
-
-    }
-}
