@@ -1,12 +1,12 @@
 
-use kgemu::{compile, definitions::{self, language}, prelude::*};
+use kgemu::{compile, definitions::language, prelude::*};
 
 fn main() {
-	hello_compile();
-	hello_emulate();
+	
 
 	let thumb_def: language::LanguageDefinition = Default::default();
-	let parsed_simple = thumb_def.parse_from_file("./sample_assembly_code/simple.thumb");
+	let mut parsed_simple: compile::parse_code::ParsedCode = Default::default();
+	parsed_simple.parse_from_file("./sample_assembly_code/command_tests.thumb", thumb_def);
 
 	println!("File Name: {}", parsed_simple.file_name);
 	println!("File Length: {}", parsed_simple.file_size);
@@ -18,6 +18,10 @@ fn main() {
 			print!(" {:?} ", section)
 		}
 		println!("");
+	}
+
+	for c in parsed_simple.commands {
+		println!("{:?}", c);
 	}
 
 	println!("End of file");

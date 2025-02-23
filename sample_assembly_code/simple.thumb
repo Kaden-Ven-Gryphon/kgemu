@@ -4,7 +4,7 @@
 @ START OF PROGRAM
 _start:
 
-	add r2, r3 @ Add r2 to r3 and store in r2
+	add r2, r2, r3 @ Add r2 to r3 and store in r2
 
 @ DATA SECTION
 .data 

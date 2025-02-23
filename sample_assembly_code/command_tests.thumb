@@ -1,0 +1,112 @@
+lsl r2, r5, #27
+	LSL	r3, r0, #0x1f
+lsl r1, 	r3, #222 @ comment
+lsr r2, r5, #27
+	LSR	r3, r0, #0x1f
+lsr r1, 	r3, #222 @ comment
+asr r2, r5, #27
+	ASR	r3, r0, #0x1f
+asr r1, 	r3, #222 @ comment
+add r1, r2, r3
+	ADD 	r2, R3, r4
+add r3,		r2, r5 @ comment
+add r1, r2, #124
+	ADD 	r2, R3, #44
+add r3,		r2, #0x4fA @ comment
+sub r1, r2, r3
+	SUB 	r2, R3, r4
+sub r3,		r2, r5 @ comment
+sub r1, r2, #124
+	SUB 	r2, R3, #44
+sub r3,		r2, #0x4fA @ comment
+mov r3, #145
+MOV 	r2, #0x44 @ comment
+	mov r4, #44
+cmp r3, #145
+CMP 	r2, #0x44 @ comment
+	cmp r4, #44
+add r3, #145
+ADD 	r2, #0x44 @ comment
+	add r4, #44
+sub r3, #145
+SUB 	r2, #0x44 @ comment
+	sub r4, #44
+and r4, r1
+eor r2, r5
+lsl r1, r4
+lsr r1, r5
+asr r2, r3
+adc r5, r2
+sbc r2, r5
+ror r1, r5
+tst r6, r2
+neg r2, r5
+cmp r3, r5
+cmn r2, r3
+ORR r3, r5
+Mul r3, r1
+BIC r3, r5
+mvn r1, r2
+add r5, h3
+add h4, r2
+add h1, h3
+cmp r3, h4
+cmp h4, r1
+cmp h4, h5
+mov r4, h5
+mov h2, r2
+mov h2, h4
+bx r3
+bx h4
+ldr r3, [pc, #45]
+ldr r2, [Pc, #0x55fa]
+str r2, [r4, r3]
+strb r2, [r4, r3]
+ldr r2, [r4, r3]
+ldrb r2, [r4, r3]
+str r2, [r4, r3]
+strh r2, [r4, r3]
+ldrh r2, [r4, r3]
+ldsb r2, [r4, r3]
+ldsh r2, [r4, r3]
+str r4, [r4, #112]
+ldr r5, [r5, #44]
+strb r2, [r5, #0x44]
+ldrb r5, [r2, #0x4fa]
+strh r2, [r5, #0x44]
+ldrh r5, [r2, #0x4fa]
+str r4, [sP, #112]
+ldr r5, [Sp, #44]
+add r5, pC, #411
+add r3, sP, #0xaaf
+add sP, #42
+add sp, #-11
+push {r0, r3, r6}
+push { r3 }
+POP { R4}
+pop { r4, R5, r2}
+push {r0, r3, r6, LR}
+push { r3, LR}
+POP { R4, PC}
+pop { r4, R5, r2, PC }
+stmia r4!, {r3}
+stmia r4!, {r3, r6}
+ldmia r3!, {r5}
+ldmia r3!, {r5, r5}
+beq right_here
+bne right_here
+bcs right_here
+bcc right_here
+bmi right_here
+bpl right_here
+bvs right_here
+bvc right_here
+bhi right_here
+bls right_here
+bge right_here
+blt right_here
+bgt right_here
+ble right_here
+SWI 43
+b hereToo
+bl here3
